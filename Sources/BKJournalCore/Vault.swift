@@ -76,6 +76,12 @@ public struct Vault: Sendable {
         return try resolve(relativePath: folder + "/" + week.label + ".md")
     }
 
+    /// Çalışma panosu notu: `<kasa>/<yol>.md`.
+    public func dashboardNoteURL(path: String) throws -> URL {
+        let trimmed = Self.trimSlashes(path)
+        return try resolve(relativePath: trimmed.hasSuffix(".md") ? trimmed : trimmed + ".md")
+    }
+
     /// Günlük not şablonunun metni. Şablon ayarlanmamışsa ya da dosya yoksa nil.
     public func templateText(settings: DailyNotesSettings) -> String? {
         guard !settings.template.isEmpty else { return nil }

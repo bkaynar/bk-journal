@@ -92,6 +92,15 @@ final class RendererTests: XCTestCase {
 
         **09.11.2026 – 15.11.2026:** 4 commit, 2 proje, +136 / −38 satır
 
+        ### Proje dağılımı
+
+        ```mermaid
+        pie showData
+            title Projelere göre commit
+            "trafik360" : 3
+            "bk-clean" : 1
+        ```
+
         ### Günlere göre
 
         | Gün | Commit | Proje | Eklenen | Silinen |
@@ -128,5 +137,68 @@ final class RendererTests: XCTestCase {
         let week = ISOWeek(containing: Support.day("2026-11-10"), calendar: calendar)
         let block = Renderer.weeklyBlock(week: week, commits: [], calendar: calendar, link: link)
         XCTAssertTrue(block.contains("**09.11.2026 – 15.11.2026:** Bu hafta commit yok."))
+    }
+
+    // MARK: Çalışma panosu
+
+    func testDashboardBlock() {
+        let commits = [
+            commit("a", "2026-11-09T06:05:00Z", "Giriş hatası düzeltildi", repo: "trafik360", files: 2, plus: 10, minus: 2),
+            commit("b", "2026-11-09T07:00:00Z", "README güncellendi", repo: "bk-clean", files: 1, plus: 5, minus: 5),
+            commit("c", "2026-11-11T11:30:00Z", "Harita katmanı eklendi", repo: "trafik360", files: 4, plus: 120, minus: 30),
+        ]
+        let block = Renderer.dashboardBlock(commits: commits, today: Support.day("2026-11-11"), days: 3, calendar: calendar, link: link)
+        XCTAssertEqual(block, """
+        <!-- bk-journal:start -->
+        ## Çalışma Panosu · son 3 gün
+
+        **09.11.2026 – 11.11.2026:** 3 commit, 2 proje, +135 / −37 satır, 2 aktif gün
+
+        ### Hangi projede ne kadar çalıştım
+
+        ```mermaid
+        pie showData
+            title Projelere göre commit (son 3 gün)
+            "trafik360" : 2
+            "bk-clean" : 1
+        ```
+
+        ### Günlük commit sayısı
+
+        ```mermaid
+        xychart-beta
+            title "Günlük commit (09.11 – 11.11)"
+            x-axis ["9", "10", "11"]
+            y-axis "Commit" 0 --> 2
+            bar [2, 0, 1]
+        ```
+
+        ### Projelere göre değişen satır
+
+        ```mermaid
+        xychart-beta
+            title "Eklenen + silinen satır"
+            x-axis ["trafik360", "bk-clean"]
+            y-axis "Satır" 0 --> 162
+            bar [162, 10]
+        ```
+
+        ### Projeler
+
+        | Proje | Commit | Aktif gün | Eklenen | Silinen | Son çalışma |
+        | --- | ---: | ---: | ---: | ---: | --- |
+        | [[10 Projeler/Trafik360/Trafik360\\|Trafik360]] | 2 | 2 | +130 | −32 | 11.11.2026 |
+        | bk-clean | 1 | 1 | +5 | −5 | 09.11.2026 |
+        <!-- bk-journal:end -->
+        """)
+    }
+
+    func testEmptyDashboardAndChartSafety() {
+        let empty = Renderer.dashboardBlock(commits: [], today: Support.day("2026-11-11"), days: 30, calendar: calendar, link: link)
+        XCTAssertTrue(empty.contains("Bu dönemde commit yok."))
+        XCTAssertFalse(empty.contains("```mermaid"), "Veri yokken boş grafik çizilmemeli")
+        // Depo adındaki tırnak ve ters tırnak grafiği ya da kod bloğunu bozamaz.
+        XCTAssertEqual(Renderer.chartLabel("a\"b`c\nd"), "a'b'c d")
+        XCTAssertNil(Renderer.pieChart(title: "x", slices: [("a", 0)]))
     }
 }

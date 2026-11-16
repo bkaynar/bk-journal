@@ -49,6 +49,10 @@ public struct Config: Codable, Sendable, Equatable {
     public var skipDirectories: [String] = []
     /// Özete alınmayacak depo adları.
     public var excludeRepos: [String] = []
+    /// Grafikli çalışma panosunun kasadaki yolu (uzantısız). Boşsa pano yazılmaz.
+    public var dashboardNote: String = "Çalışma Panosu"
+    /// Panonun kapsadığı gün sayısı (bugün dahil).
+    public var dashboardDays: Int = 30
 
     public init() {}
 
@@ -66,6 +70,8 @@ public struct Config: Codable, Sendable, Equatable {
         maxDepth = try c.decodeIfPresent(Int.self, forKey: .maxDepth) ?? d.maxDepth
         skipDirectories = try c.decodeIfPresent([String].self, forKey: .skipDirectories) ?? d.skipDirectories
         excludeRepos = try c.decodeIfPresent([String].self, forKey: .excludeRepos) ?? d.excludeRepos
+        dashboardNote = try c.decodeIfPresent(String.self, forKey: .dashboardNote) ?? d.dashboardNote
+        dashboardDays = try c.decodeIfPresent(Int.self, forKey: .dashboardDays) ?? d.dashboardDays
     }
 
     /// Ayar dosyasını okur. Dosya yoksa varsayılanlar döner; `createIfMissing` ise dosya da oluşturulur.

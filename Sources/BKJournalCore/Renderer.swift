@@ -111,6 +111,7 @@ public enum Renderer {
             return MarkerBlock.wrap(lines.joined(separator: "\n"))
         }
         lines.append("**\(range):** \(totals(commits))")
+        lines += weeklyChart(commits)
 
         let byDay = Dictionary(grouping: commits) { LocalDay(date: $0.date, calendar: calendar) }
         lines += ["", "### Günlere göre", "", "| Gün | Commit | Proje | Eklenen | Silinen |", "| --- | ---: | ---: | ---: | ---: |"]

@@ -9,6 +9,7 @@ BK Journal — günlük git çalışmalarını Obsidian günlük notuna yazar.
 Kullanım:
   bkjournal yaz [--tarih YYYY-MM-DD] [--kuru]     Bir günün özetini günlük nota yazar (varsayılan: bugün)
   bkjournal hafta [--tarih YYYY-MM-DD] [--kuru]   O günü içeren haftanın (Pzt–Paz) raporunu yazar
+  bkjournal pano [--kuru]                         Grafikli çalışma panosunu (son 30 gün) günceller
   bkjournal tamamla [--kuru]                      Son çalışmadan bu yana eksik günleri (en fazla 7) tamamlar
   bkjournal kur                                   Her gün otomatik çalışacak zamanlayıcıyı kurar
   bkjournal kaldir                                Zamanlayıcıyı kaldırır
@@ -127,6 +128,22 @@ func run() throws -> Int32 {
         }
         return 0
 
+    case "pano", "dashboard":
+        let options = try parseOptions(arguments)
+        guard options.day == nil else { throw JournalError.usage("pano komutu --tarih almaz.") }
+        let journal = try loadJournal(dry: options.dry)
+        guard let report = try journal.planDashboard() else {
+            print("Pano kapalı: config.json içinde \"dashboardNote\" boş.")
+            return 0
+        }
+        if options.dry {
+            printDry(report, journal: journal)
+        } else {
+            try NoteWriter.commit(report.plan)
+            print(describe(report, dry: false))
+        }
+        return 0
+
     case "tamamla", "catchup":
         let options = try parseOptions(arguments)
         guard options.day == nil else { throw JournalError.usage("tamamla komutu --tarih almaz.") }
@@ -135,7 +152,7 @@ func run() throws -> Int32 {
         if report.capped {
             print("Son çalışmadan bu yana \(CatchUp.maxDays) günden fazla geçmiş; yalnızca son \(CatchUp.maxDays) gün işlendi.")
         }
-        for item in report.days + report.weeks { print(describe(item, dry: options.dry)) }
+        for item in report.days + report.weeks + [report.dashboard].compactMap({ $0 }) { print(describe(item, dry: options.dry)) }
         for failure in report.failures { printError("Hata (\(failure.label)): \(failure.message)") }
         if options.dry { print("Kuru çalıştırma: hiçbir şey yazılmadı.") }
         return report.failures.isEmpty ? 0 : 1

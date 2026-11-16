@@ -11,6 +11,8 @@ public struct NoteReport: Sendable {
 public struct CatchUpReport: Sendable {
     public var days: [NoteReport] = []
     public var weeks: [NoteReport] = []
+    /// Grafikli çalışma panosu (ayarlarda kapalıysa nil).
+    public var dashboard: NoteReport?
     /// İşlenemeyen notlar ve nedenleri.
     public var failures: [(label: String, message: String)] = []
     /// Son çalışmadan bu yana 7 günden fazla geçtiği için eski günler atlandıysa true.
@@ -129,6 +131,31 @@ public struct Journal: Sendable {
         return NoteReport(label: week.label, block: block, plan: plan, commitCount: weekCommits.count)
     }
 
+    // MARK: Çalışma panosu
+
+    var dashboardDayCount: Int { max(1, min(config.dashboardDays, 366)) }
+
+    /// Panonun kapsadığı ilk gün.
+    var dashboardFirstDay: LocalDay { today.adding(days: -(dashboardDayCount - 1), calendar: calendar) }
+
+    /// Grafikli çalışma panosunu planlar; diske yazmaz. Ayarlarda pano kapalıysa nil döner.
+    public func planDashboard(commits provided: [Commit]? = nil) throws -> NoteReport? {
+        guard !config.dashboardNote.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let first = dashboardFirstDay
+        let all = provided ?? commits(from: first, through: today)
+        let window = all.filter {
+            let day = LocalDay(date: $0.date, calendar: calendar)
+            return !(day < first) && !(today < day)
+        }
+        let url = try vault.dashboardNoteURL(path: config.dashboardNote)
+        let block = Renderer.dashboardBlock(commits: window, today: today, days: dashboardDayCount, calendar: calendar, link: link)
+        let title = url.deletingPathExtension().lastPathComponent
+        let plan = try NoteWriter.plan(url: url, block: block) {
+            ("# \(title)\n", .noTemplate)
+        }
+        return NoteReport(label: title, block: block, plan: plan, commitCount: window.count)
+    }
+
     // MARK: Tamamlama
 
     /// Son başarılı çalışmadan bugüne kadarki günleri (en fazla 7) ve biten haftaları işler.
@@ -143,7 +170,9 @@ public struct Journal: Sendable {
         if let last, let first = days.first, last < first { report.capped = true }
 
         // Tek seferde toplanır: en erken gün ya da en erken haftanın Pazartesi'si.
-        let earliest = ([days.first].compactMap { $0 } + weeks.map(\.monday)).min() ?? today
+        // Pano açıksa onun penceresi de kapsanır.
+        let dashboardEnabled = !config.dashboardNote.trimmingCharacters(in: .whitespaces).isEmpty
+        let earliest = ([days.first].compactMap { $0 } + weeks.map(\.monday) + (dashboardEnabled ? [dashboardFirstDay] : [])).min() ?? today
         let all = commits(from: earliest, through: today)
 
         for day in days {
@@ -163,6 +192,14 @@ public struct Journal: Sendable {
             } catch {
                 report.failures.append((week.label, error.localizedDescription))
             }
+        }
+        do {
+            if let result = try planDashboard(commits: all) {
+                if write { try NoteWriter.commit(result.plan) }
+                report.dashboard = result
+            }
+        } catch {
+            report.failures.append(("Çalışma Panosu", error.localizedDescription))
         }
         if write, report.failures.isEmpty {
             try State(lastSuccessfulDay: today.description, lastRunAt: now).save(to: stateURL)
